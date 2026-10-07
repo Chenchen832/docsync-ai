@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}检测结果 · DocSync-AI{% endblock %}
+{% block content %}
+<section class="result-header">
+  <div>
+    <p class="eyebrow">ANALYSIS COMPLETE</p>
+    <h1>检测结果总览</h1>
+    <p class="project-path">{{ result.source_label }}</p>
+    <p class="mode-line">AI 语义复核：<strong>{{ result.ai_label }}</strong>{% if result.ai_label == 'Demo / Mock' %}<span class="mock-pill">Demo / Mock，非真实模型</span>{% endif %}</p>
+  </div>
+  <div class="header-actions">
+    <a class="button button-secondary" href="/results/{{ report_id }}/export.json">导出 JSON</a>
+    <a class="button button-primary" href="/results/{{ report_id }}/export.md">导出 Markdown</a>
+  </div>
+</section>
+
+{% if not focus %}
+{% if result.notice %}<div class="notice warning">{{ result.notice }}</div>{% endif %}
+{% for warning in report.analysis_warnings %}<div class="notice">{{ warning }}</div>{% endfor %}
+{% if report.analysis_errors %}<div class="notice warning">检测完成，但有 {{ report.analysis_errors|length }} 项文件或服务错误；其他结果不受影响。</div>{% endif %}
+
+<section class="stats-grid">
+  {% set s = report.summary %}
+  <article><span>扫描文件</span><strong>{{ s.scanned_files }}</strong></article>
+  <article><span>Python</span><strong>{{ s.python_files }}</strong></article>
+  <article><span>Markdown</span><strong>{{ s.markdown_files }}</strong></article>
+  <article><span>配置文件</span><strong>{{ s.config_files }}</strong></article>
+  <article><span>代码实体</span><strong>{{ s.code_entities }}</strong></article>
+  <article><span>文档实体</span><strong>{{ s.doc_entities }}</strong></article>
+  <article class="accent"><span>Confirmed</span><strong>{{ s.confirmed_findings }}</strong></article>
+  <article><span>Semantic Candidates</span><strong>{{ s.semantic_candidates }}</strong></article>
+  <article class="risk-high"><span>HIGH</span><strong>{{ s.severity.HIGH }}</strong></article>
+  <article class="risk-medium"><span>MEDIUM</span><strong>{{ s.severity.MEDIUM }}</strong></article>
+  <article class="risk-low"><span>LOW</span><strong>{{ s.severity.LOW }}</strong></article>
+</section>
+
+{% if report.ai_statistics.enabled %}
+<section class="ai-summary panel">
+  <div><span>AI Review</span><strong>{{ ai_counts.reviews }}</strong></div>
+  <div><span>AI 消解</span><strong>{{ ai_counts.resolved }}</strong></div>
+  <div><span>AI 升级 Finding</span><strong>{{ ai_counts.promoted }}</strong></div>
+  <div><span>需要人工复核</span><strong>{{ ai_counts.manual }}</strong></div>
+</section>
+{% endif %}
+
+<section class="filter-bar panel" aria-label="结果筛选">
+  <strong>筛选结果</strong>
+  <label>风险<select id="severity-filter"><option value="all">全部</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select></label>
+  <label>类型<select id="rule-filter"><option value="all">全部</option>{% for id in rule_labels %}<option>{{ id }}</option>{% endfor %}</select></label>
+  <label>状态<select id="status-filter"><option value="all">全部</option><option value="confirmed">Confirmed</option><option value="candidate">Semantic Candidate</option></select></label>
+  <span id="visible-count"></span>
+</section>
+{% endif %}
+
+{% if focus != 'semantic' %}
+<section class="results-section">
+  <div class="section-heading"><div><span class="step">01</span><h2>已确认问题</h2></div><span class="count-pill">{{ report.findings|length }} 项</span></div>
+  <div class="finding-list">
+  {% for finding in report.findings %}
+    {% if not focus or focus == finding.rule_id %}
+    <article id="finding-{{ finding.rule_id }}" class="finding-card result-item" data-severity="{{ finding.severity }}" data-rule="{{ finding.rule_id }}" data-status="confirmed">
+      <div class="finding-topline">
+        <span class="rule-id">{{ finding.rule_id }}</span>
+        <div><h3>{{ rule_labels.get(finding.rule_id, finding.issue_type) }}</h3><small>{{ finding.issue_type }}</small></div>
+        <span class="severity {{ finding.severity|lower }}">{{ finding.severity }}</span>
+      </div>
+      <div class="finding-meta">
+        <span>来源 <strong>{{ finding.source }}</strong></span>
+        <span>检测置信分 <strong>{{ '%.2f'|format(finding.confidence) }}</strong></span>
+      </div>
+      <p class="finding-message">{{ finding.message }}</p>
+      <div class="location-grid">
+        <div><span>代码位置</span><code>{{ finding.code_location.file_path }}:{{ finding.code_location.line_start }}</code></div>
+        <div><span>文档位置</span><code>{{ finding.doc_location.file_path }}:{{ finding.doc_location.line_start }}</code></div>
+      </div>
+      <details{% if focus == finding.rule_id %} open{% endif %}>
+        <summary>展开代码事实与文档事实</summary>
+        <div class="fact-grid">
+          <div><h4>真实代码事实</h4><pre>{{ json_dump(finding.code_fact) }}</pre></div>
+          <div><h4>文档事实</h4><pre>{{ json_dump(finding.doc_fact) }}</pre></div>
+        </div>
+      </details>
+      <div class="suggestion"><span>建议修改</span><p>{{ finding.suggestion }}</p></div>
+    </article>
+    {% endif %}
+  {% else %}<div class="empty-state">没有发现确定性问题。</div>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if not focus or focus == 'semantic' %}
+<section id="semantic-review" class="results-section semantic-section">
+  <div class="section-heading"><div><span class="step">02</span><h2>待语义确认</h2></div><span class="count-pill">语义复核</span></div>
+  <div class="candidate-list">
+  {% for review in report.semantic_reviews %}
+    <article class="candidate-card result-item" data-severity="MEDIUM" data-rule="DS001" data-status="candidate">
+      <div class="finding-topline"><span class="rule-id">DS001</span><div><h3>{{ status_labels.get(review.final_status, review.final_status) }}</h3><small>{{ review.decision }}</small></div><span class="status-dot {{ review.final_status|lower }}"></span></div>
+      <div class="semantic-compare">
+        <div><span>代码参数</span><strong>{{ review.candidate_snapshot.code_parameter }}</strong></div>
+        <span class="compare-arrow">↔</span>
+        <div><span>文档参数</span><strong>{{ review.candidate_snapshot.doc_parameter }}</strong></div>
+      </div>
+      <p>{{ review.reason }}</p>
+      {% if review.final_status == 'RESOLVED_CONSISTENT' %}<div class="semantic-message success">AI 复核：两者表达相同含义，不计为错误。</div>{% endif %}
+      {% if review.final_status == 'CONFIRMED' %}<div class="semantic-message danger">AI 复核后确认存在语义不一致。</div>{% endif %}
+      {% if review.final_status == 'NEEDS_MANUAL_REVIEW' %}<div class="semantic-message warning">AI 无法可靠判断，建议人工确认。</div>{% endif %}
+    </article>
+  {% endfor %}
+  {% for candidate in report.semantic_candidates %}
+    {% set reviewed_ids = report.semantic_reviews|map(attribute='candidate_id')|list %}
+    {% if candidate.metadata.candidate_id is not defined or candidate.metadata.candidate_id not in reviewed_ids %}
+    <article class="candidate-card result-item" data-severity="{{ candidate.severity }}" data-rule="{{ candidate.rule_id }}" data-status="candidate">
+      <div class="finding-topline"><span class="rule-id">{{ candidate.rule_id }}</span><div><h3>{{ status_labels.get(candidate.status, candidate.status) }}</h3><small>{{ rule_labels.get(candidate.rule_id, candidate.issue_type) }}</small></div><span class="severity {{ candidate.severity|lower }}">{{ candidate.severity }}</span></div>
+      <div class="semantic-compare"><div><span>代码参数</span><strong>{{ candidate.code_fact.parameters|join(', ') }}</strong></div><span class="compare-arrow">↔</span><div><span>文档参数</span><strong>{{ candidate.doc_fact.documented_parameter }}</strong></div></div>
+      <p>{{ candidate.message }}</p>
+      <details><summary>查看对齐证据</summary><pre>{{ json_dump(candidate.metadata.alignment_evidence) }}</pre></details>
+      <div class="suggestion"><span>建议修改</span><p>{{ candidate.suggestion }}</p></div>
+    </article>
+    {% endif %}
+  {% endfor %}
+  {% if not report.semantic_candidates and not report.semantic_reviews %}<div class="empty-state">当前没有待语义确认项。</div>{% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

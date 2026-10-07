@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}DocSync-AI · 开始检测{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">DOCUMENTATION DRIFT DETECTION</p>
+    <h1>代码—文档一致性<br>智能检测工具</h1>
+    <p class="hero-copy">自动发现开源项目代码更新后文档未同步的问题，并提供定位与修复建议。</p>
+  </div>
+  <div class="hero-metric" aria-label="核心能力">
+    <strong>DS001–DS005</strong>
+    <span>静态规则 · 语义复核 · 可解释结果</span>
+  </div>
+</section>
+
+<section class="panel input-panel">
+  <div class="section-heading">
+    <div><span class="step">01</span><h2>选择检测项目</h2></div>
+    <button id="demo-button" class="button button-demo" type="button"
+            data-demo-path="{{ demo_path }}">体验示例检测</button>
+  </div>
+  <form id="analysis-form" action="/analyze" method="post">
+    <div class="source-tabs" role="radiogroup" aria-label="项目来源">
+      <label class="source-option active"><input type="radio" name="input_source" value="local" checked>本地项目路径</label>
+      <label class="source-option"><input type="radio" name="input_source" value="git">Git 仓库 URL</label>
+      <label class="source-option"><input type="radio" name="input_source" value="demo">内置 Demo</label>
+    </div>
+
+    <div id="local-fields" class="field-group">
+      <label for="local-path">本地目录</label>
+      <input id="local-path" name="local_path" type="text" autocomplete="off"
+             placeholder="D:\your-project" value="">
+      <p class="field-help">只读取该目录内的 Python、Markdown 和静态配置文件，不执行项目代码。</p>
+    </div>
+    <div id="git-fields" class="field-group hidden">
+      <label for="git-url">HTTPS Git 仓库地址</label>
+      <input id="git-url" name="git_url" type="url" autocomplete="off"
+             placeholder="https://github.com/example/project.git">
+      <label class="check-row"><input type="checkbox" name="keep_clone">分析后保留临时 clone</label>
+      <p class="field-help">仓库仅 clone 到比赛项目的临时目录；不会安装依赖或运行仓库命令。</p>
+    </div>
+    <div id="demo-fields" class="demo-note hidden">
+      <strong>已选择内置 Demo</strong>
+      <span>{{ demo_path }}</span>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-heading compact"><div><span class="step">02</span><h2>AI 语义复核</h2></div></div>
+    <div class="ai-options">
+      <label class="choice-card"><input type="radio" name="ai_option" value="off" checked><span><strong>关闭</strong><small>默认，仅运行确定性检测</small></span></label>
+      <label class="choice-card"><input type="radio" name="ai_option" value="review"><span><strong>开启</strong><small>使用环境变量配置的真实 Provider</small></span></label>
+      <label class="choice-card mock"><input type="radio" name="ai_option" value="mock"><span><strong>Demo / Mock</strong><small>离线演示三种语义决策</small></span></label>
+    </div>
+
+    <button class="button button-primary button-wide" type="submit">开始检测 <span>→</span></button>
+  </form>
+</section>
+
+<div id="loading" class="loading-overlay hidden" role="status" aria-live="polite">
+  <div class="loading-card"><span class="spinner"></span><strong>DocSync-AI 正在检测</strong><p id="loading-message">正在读取项目……</p></div>
+</div>
+{% endblock %}
